@@ -1,5 +1,5 @@
 /* filesys.h
- * 
+ *
  * describes FAT structures
  * http://www.c-jump.com/CIS24/Slides/FAT/lecture.html#F01_0020_fat
  * http://www.tavi.co.uk/phobos/fat.html
@@ -19,7 +19,7 @@
 
 #define MAXBLOCKS     1024
 #define BLOCKSIZE     1024
-#define FATENTRYCOUNT (BLOCKSIZE / sizeof(fatentry_t))
+#define FATENTRYCOUNT (BLOCKSIZE / sizeof(fatentry_t))  //512
 #define DIRENTRYCOUNT ((BLOCKSIZE - (2*sizeof(int)) ) / sizeof(direntry_t))
 #define MAXNAME       256
 #define MAXPATHLENGTH 1024
@@ -109,9 +109,9 @@ void writedisk ( const char * filename ) ;
 
 /*
 #define NUM_TYPES (sizeof types / sizeof types[0])
-static* int types[] = { 
+static* int types[] = {
     1,
-    2, 
-    3, 
+    2,
+    3,
     4 };
 */
