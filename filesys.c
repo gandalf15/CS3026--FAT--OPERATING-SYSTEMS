@@ -1,7 +1,7 @@
 /* filesys.c
- * 
+ *
  * provides interface to virtual disk
- * 
+ *
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -17,11 +17,11 @@ direntry_t * currentDir              = NULL ;
 fatentry_t   currentDirIndex         = 0 ;
 
 /* writedisk : writes virtual disk out to physical disk
- * 
+ *
  * in: file name of stored virtual disk
  */
 
-void writedisk ( const char * filename )
+void writeDisk ( const char * filename )
 {
    printf ( "writedisk> virtualdisk[0] = %s\n", virtualDisk[0].data ) ;
    FILE * dest = fopen( filename, "w" ) ;
@@ -29,10 +29,10 @@ void writedisk ( const char * filename )
       fprintf ( stderr, "write virtual disk to disk failed\n" ) ;
    //write( dest, virtualDisk, sizeof(virtualDisk) ) ;
    fclose(dest) ;
-   
+
 }
 
-void readdisk ( const char * filename )
+void readDisk ( const char * filename )
 {
    FILE * dest = fopen( filename, "r" ) ;
    if ( fread ( virtualDisk, sizeof(virtualDisk), 1, dest ) < 0 )
@@ -46,53 +46,66 @@ void readdisk ( const char * filename )
  * this moves memory around
  */
 
-void writeblock ( diskblock_t * block, int block_address )
+void writeBlock ( diskblock_t * block, int block_address )
 {
    //printf ( "writeblock> block %d = %s\n", block_address, block->data ) ;
    memmove ( virtualDisk[block_address].data, block->data, BLOCKSIZE ) ;
    //printf ( "writeblock> virtualdisk[%d] = %s / %d\n", block_address, virtualDisk[block_address].data, (int)virtualDisk[block_address].data ) ;
 }
 
+void copyFat(fatentry_t *FAT, unsigned int num_of_fat_blocks)
+{
+  diskblock_t block;
+  unsigned int i,j,index = 0;
+  for (i = 1; i <= num_of_fat_blocks; i++)
+  {
+    for (j = 0; j < FATENTRYCOUNT; j++)
+    {
+      block.fat[j] = FAT[index];
+      ++index;
+    }
+    writeBlock(&block, i);
+  }
+}
 
-/* read and write FAT
- * 
- * please note: a FAT entry is a short, this is a 16-bit word, or 2 bytes
- *              our blocksize for the virtual disk is 1024, therefore
- *              we can store 512 FAT entries in one block
- * 
- *              how many disk blocks do we need to store the complete FAT:
- *              - our virtual disk has MAXBLOCKS blocks, which is currently 1024
- *                each block is 1024 bytes long
- *              - our FAT has MAXBLOCKS entries, which is currently 1024
- *                each FAT entry is a fatentry_t, which is currently 2 bytes
- *              - we need (MAXBLOCKS /(BLOCKSIZE / sizeof(fatentry_t))) blocks to store the
- *                FAT
- *              - each block can hold (BLOCKSIZE / sizeof(fatentry_t)) fat entries
- */
-
-/* implement format()
- */
-void format ( )
+void format (char * disk_name)
 {
    diskblock_t block ;
-   direntry_t  rootDir ;
-   int         pos             = 0 ;
-   int         fatentry        = 0 ;
-   int         fatblocksneeded =  (MAXBLOCKS / FATENTRYCOUNT ) ;
-
-   /* prepare block 0 : fill it with '\0',
-    * use strcpy() to copy some text to it for test purposes
-	* write block 0 to virtual disk
-	*/
-
-	/* prepare FAT table
-	 * write FAT blocks to virtual disk
-	 */
-
-	 /* prepare root directory
-	  * write root directory block to virtual disk
-	  */
-
+   unsigned int i = 1;
+   for (i = 0; i < BLOCKSIZE; i++)
+   {
+     block.data[i] = '\0';
+   }
+   memcpy(block.data, disk_name, strlen(disk_name));
+   writeBlock(&block, 0);
+   FAT[0] = ENDOFCHAIN;
+   unsigned int num_of_fat_blocks;
+   num_of_fat_blocks = (unsigned int)(MAXBLOCKS+(FATENTRYCOUNT-1))/FATENTRYCOUNT;
+   for (i = 1; i < num_of_fat_blocks; i++)
+   {
+     FAT[i] = i+1;
+   }
+   FAT[num_of_fat_blocks] = ENDOFCHAIN; //end of fat table
+   FAT[num_of_fat_blocks+1] = ENDOFCHAIN; // root dir
+   for(i = num_of_fat_blocks+2; i < MAXBLOCKS; i++)
+   {
+     FAT[i] = UNUSED;
+   }
+   copyFat(FAT, num_of_fat_blocks);
+   diskblock_t rootBlock;
+   rootBlock.dir.isdir = TRUE;
+   rootBlock.dir.nextEntry = FALSE;
+   rootDirIndex = num_of_fat_blocks+1;
+   direntry_t emptyDir;
+   emptyDir.isdir = TRUE;
+   emptyDir.unused = TRUE;
+   emptyDir.filelength = 0;
+   memcpy(emptyDir.name,"empty directory", strlen("empty directory"));
+   for (i = 0; i < DIRENTRYCOUNT; i++)
+   {
+     rootBlock.dir.entrylist[i] = emptyDir;
+   }
+   writeBlock(&rootBlock, (int)rootDirIndex);
 }
 
 
@@ -103,4 +116,3 @@ void printBlock ( int blockIndex )
 {
    printf ( "virtualdisk[%d] = %s\n", blockIndex, virtualDisk[blockIndex].data ) ;
 }
-

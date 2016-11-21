@@ -19,14 +19,14 @@
 
 #define MAXBLOCKS     1024
 #define BLOCKSIZE     1024
-#define FATENTRYCOUNT (BLOCKSIZE / sizeof(fatentry_t))  //512
+#define FATENTRYCOUNT (BLOCKSIZE / sizeof(fatentry_t))
 #define DIRENTRYCOUNT ((BLOCKSIZE - (2*sizeof(int)) ) / sizeof(direntry_t))
 #define MAXNAME       256
 #define MAXPATHLENGTH 1024
 
 #define UNUSED        -1
 #define ENDOFCHAIN     0
-#define EOF           -1
+//#define EOF           -1
 
 
 typedef unsigned char Byte ;
@@ -101,8 +101,8 @@ typedef struct filedescriptor {
 
 
 
-void format() ;
-void writedisk ( const char * filename ) ;
+void format(char * disk_name) ;
+void writeDisk ( const char * filename ) ;
 
 
 #endif
