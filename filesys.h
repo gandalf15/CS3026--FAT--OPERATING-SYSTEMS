@@ -26,6 +26,8 @@
 
 #define UNUSED        -1
 #define ENDOFCHAIN     0
+#define DATA           0
+#define DIR            1
 //#define EOF           -1
 
 
