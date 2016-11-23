@@ -104,7 +104,6 @@ int getFreeBlock(){
 diskblock_t initBlock(int index, const char type){
   int i;
   diskblock_t block;
-  memset(&block, '\0', BLOCKSIZE);
   if(type == DIR){
     block.dir.isdir = TRUE;
     block.dir.nextEntry = 0;
@@ -115,6 +114,12 @@ diskblock_t initBlock(int index, const char type){
       memcpy(&block.dir.entrylist[i], newEntry, DIRENTRYCOUNT);
     }
     free(newEntry);
+  }
+  else{
+    int i;
+    for (i = 0; i < BLOCKSIZE; i++) {
+      block.data[i] = '\0';
+    }
   }
   writeBlock(&block, index);
   return block;
@@ -156,7 +161,7 @@ char myfgetc(MyFILE * stream){
     }
     else{
       stream->blockno = FAT[stream->blockno];
-      memcpy(stream->buffer, &virtualDisk[stream->blockno], BLOCKSIZE);
+      memcpy(&stream->buffer, &virtualDisk[stream->blockno], BLOCKSIZE);
       stream->pos = 0;
       return stream->buffer->data[stream->pos];
     }
@@ -165,54 +170,57 @@ char myfgetc(MyFILE * stream){
 }
 
 int myfputc(char b, MyFILE * stream){
+  printf("inside myfputc\n");
   if (strcmp(stream->mode, "r") == 0) return 1;
+  printf("hsdaj %d\n", stream->pos+1);
   if (stream->pos+1 >= BLOCKSIZE){
+    printf("before writeblock\n");
+    writeBlock(stream->buffer,stream->blockno);
+    printf("after write block\n");
     stream->pos = 0;
     int index = getFreeBlock();
     diskblock_t newBlock = initBlock(index, DATA);
-    memcpy(stream->buffer, &newBlock, BLOCKSIZE);
+    memcpy(&stream->buffer, &newBlock, BLOCKSIZE);
+    printf("after memcpy\n");
     FAT[stream->blockno] = index;
     FAT[index] = ENDOFCHAIN;
     stream->blockno = index;
     copyFat(FAT);
   }
+  printf("after if\n");
+  printf("%p\n",&stream->buffer->data);
   stream->buffer->data[stream->pos++] = b;
+  printf("after buf\n");
   writeBlock(stream->buffer, stream->blockno);
   return 0;
 }
-/*
-MyFILE * myfopen(char * name, const char * mode){
-  int fileEntryIndex = findEntryIndex(name, name);
-  if (fileEntryIndex == -1 && strncmp(mode, "w", 1) == 0){
-    printf("Creating new file: %s\n", name);
-    int freeBlockIndex = getFreeBlock();
-    direntry_t *newEntry = malloc(sizeof(direntry_t));
-    newEntry->unused = FALSE;
-    newEntry->filelength = 0;
-    newEntry->firstblock = freeBlockIndex;
-    int i = 0;
-    for(i = 0; i < DIRENTRYCOUNT; i ++){
-      if (virtualDisk[currentDirIndex].dir.entrylist[i].unused == TRUE){
-        virtualDisk[currentDirIndex].dir.entrylist[i] = *newEntry;
-        break;
-      }
-    }
-    MyFILE * ptrFile = malloc(sizeof(MyFILE));
-    ptrFile->pos = 0;
-    ptrFile->writing = 1;
-    strcpy(ptrFile->mode, "w");
-    ptrFile->blockno = freeBlockIndex;
-    ptrFile->buffer = initBlock(freeBlockIndex, DATA);
-    return ptrFile;
-  }
-  else{
-    printf("no read mode");
-  }
-}
-*/
 
-int myfclose(MyFILE *file)
-{
+MyFILE * myfopen(char * name, char mode){
+  int index = getFreeBlock();
+  diskblock_t newBlock = initBlock(index, DATA);
+  FAT[index] = ENDOFCHAIN;
+  int i;
+  for(i = 0; i < DIRENTRYCOUNT; i++){
+    if (virtualDisk[currentDirIndex].dir.entrylist[i].unused == TRUE){
+      virtualDisk[currentDirIndex].dir.entrylist[i].unused = FALSE;
+      strcpy(virtualDisk[currentDirIndex].dir.entrylist[i].name, name);
+      virtualDisk[currentDirIndex].dir.entrylist[i].firstblock = index;
+      break;
+    }
+  }
+  MyFILE * file = malloc(sizeof(MyFILE));
+  file->pos = 0;
+  file->writing = 0;
+  strcpy(file->mode, &mode);
+  file->blockno = index;
+  memmove (&file->buffer, &virtualDisk[index], BLOCKSIZE );
+  copyFat(FAT);
+  printf("returning file\n");
+  return file;
+}
+
+int myfclose(MyFILE *file){
+  writeBlock(file->buffer,file->blockno);
   free(file);
   return 0;
 }

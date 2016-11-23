@@ -8,7 +8,7 @@ void cgsD(){
   format("CS3026 Operating Systems Assessment 2016");
   writeDisk("virtualdiskD3_D1\0");
 }
-/*
+
 void cgsC(){
   // create a new file in write mode
   MyFILE *test_file = myfopen("test_file.txt", "w");
@@ -18,9 +18,9 @@ void cgsC(){
 
   // fill a 4kb file
   int i;
-  for (i = 0; i < 4 * BLOCKSIZE; i++){
+  for (i = 0; i < BLOCKSIZE; i++){
     // myfputc(string[rand() % (int) (sizeof string - 1)], test_file); //use for random data
-    myfputc('0', test_file);
+    myfputc('H', test_file);
   }
 
   myfclose(test_file);
@@ -46,8 +46,8 @@ void cgsC(){
   myfclose(test_file2);
   writeDisk("virtualdiskC3_C1\0");
 }
-*/
+
 void main(){
   cgsD();
-  //cgsC();
+  cgsC();
 }
