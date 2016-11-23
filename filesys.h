@@ -98,7 +98,7 @@ typedef struct filedescriptor {
    char        mode[3] ;
    Byte        writing ;
    fatentry_t  blockno ;
-   diskblock_t buffer ;
+   diskblock_t *buffer ;
 } MyFILE ;
 
 

@@ -8,7 +8,7 @@ void cgsD(){
   format("CS3026 Operating Systems Assessment 2016");
   writeDisk("virtualdiskD3_D1\0");
 }
-
+/*
 void cgsC(){
   // create a new file in write mode
   MyFILE *test_file = myfopen("test_file.txt", "w");
@@ -46,8 +46,8 @@ void cgsC(){
   myfclose(test_file2);
   writeDisk("virtualdiskC3_C1\0");
 }
-
+*/
 void main(){
   cgsD();
-  cgsC();
+  //cgsC();
 }

@@ -77,8 +77,9 @@ void format (char * disk_name){
    }
    copyFat(FAT);
    diskblock_t rootBlock;
+   //call init block and get clean block
    rootBlock.dir.isdir = TRUE;
-   rootBlock.dir.nextEntry = FALSE;
+   rootBlock.dir.nextEntry = FALSE; //does not have to be if the block is zeroed
    rootDirIndex = num_of_fat_blocks+1;
    currentDirIndex = num_of_fat_blocks+1;
    direntry_t emptyDir;
@@ -89,7 +90,7 @@ void format (char * disk_name){
    for (i = 0; i < DIRENTRYCOUNT; i++){
      rootBlock.dir.entrylist[i] = emptyDir;
    }
-   writeBlock(&rootBlock, (int)rootDirIndex);
+   writeBlock(&rootBlock, rootDirIndex);
 }
 
 int getFreeBlock(){
@@ -101,33 +102,29 @@ int getFreeBlock(){
 }
 
 diskblock_t initBlock(int index, const char type){
-  diskblock_t block = virtualDisk[index];
   int i;
-  if(type == DATA){
-    for (i = 0; i < BLOCKSIZE; i++){
-      block.data[i] = '\0';
-    }
-  }
-  else{
+  diskblock_t block;
+  memset(&block, '\0', BLOCKSIZE);
+  if(type == DIR){
     block.dir.isdir = TRUE;
     block.dir.nextEntry = 0;
-    direntry_t *newEntry;
+    direntry_t *newEntry = malloc(sizeof(direntry_t));
+    newEntry->unused = TRUE;
+    newEntry->filelength = 0;
     for(i = 0; i < DIRENTRYCOUNT; i ++){
-      newEntry = malloc(sizeof(direntry_t));
-      newEntry->unused = TRUE;
-      newEntry->filelength = 0;
-      block.dir.entrylist[i] = *newEntry;
+      memcpy(&block.dir.entrylist[i], newEntry, DIRENTRYCOUNT);
     }
+    free(newEntry);
   }
-  writeBlock(&block, (int)index);
+  writeBlock(&block, index);
   return block;
 }
 
-int findEntryIndex(const char * name, const char * path){
+int findEntryIndex(const char * name){
   int i;
   while(TRUE){
     for(i = 0; i < DIRENTRYCOUNT; i++){
-      if (memcmp(virtualDisk[currentDirIndex].dir.entrylist[i].name, name, strlen(name) + 1) == 0)
+      if (strcmp(virtualDisk[currentDirIndex].dir.entrylist[i].name, name) == 0)
         return i;
     }
     if(FAT[currentDirIndex] == ENDOFCHAIN) break;
@@ -136,15 +133,15 @@ int findEntryIndex(const char * name, const char * path){
   return -1;
 }
 
-int myRm (const char * name, const char * path){
-  int entryIndex = findEntryIndex(name, path);
+int myRm (const char * name){
+  int entryIndex = findEntryIndex(name);
   int fatBlockIndex = virtualDisk[currentDirIndex].dir.entrylist[entryIndex].firstblock;
   virtualDisk[currentDirIndex].dir.entrylist[entryIndex].unused = TRUE;
   int nextIndex = fatBlockIndex;
   while(TRUE){
     if(FAT[nextIndex] == ENDOFCHAIN){
       FAT[nextIndex] = UNUSED;
-      break;
+      return 0;
     }
     nextIndex = FAT[fatBlockIndex];
     FAT[fatBlockIndex] = UNUSED;
@@ -159,31 +156,31 @@ char myfgetc(MyFILE * stream){
     }
     else{
       stream->blockno = FAT[stream->blockno];
-      stream->buffer = virtualDisk[stream->blockno];
+      memcpy(stream->buffer, &virtualDisk[stream->blockno], BLOCKSIZE);
       stream->pos = 0;
-      return stream->buffer.data[stream->pos];
+      return stream->buffer->data[stream->pos];
     }
   }
-  return stream->buffer.data[++stream->pos];
+  return stream->buffer->data[++stream->pos];
 }
 
 int myfputc(char b, MyFILE * stream){
-  if (strncmp(stream->mode, "r", 1) == 0) return 1;
-  if (stream->pos+1 == BLOCKSIZE){
+  if (strcmp(stream->mode, "r") == 0) return 1;
+  if (stream->pos+1 >= BLOCKSIZE){
     stream->pos = 0;
-    if(FAT[stream->blockno] == ENDOFCHAIN){
-      int index = getFreeBlock();
-      stream->blockno = index;
-      stream->buffer = initBlock(index, DATA);
-      FAT[stream->blockno] = index;
-      copyFat(FAT);
-    }
+    int index = getFreeBlock();
+    diskblock_t newBlock = initBlock(index, DATA);
+    memcpy(stream->buffer, &newBlock, BLOCKSIZE);
+    FAT[stream->blockno] = index;
+    FAT[index] = ENDOFCHAIN;
+    stream->blockno = index;
+    copyFat(FAT);
   }
-  stream->buffer.data[stream->pos++] = b;
-  writeBlock(&stream->buffer, stream->blockno);
+  stream->buffer->data[stream->pos++] = b;
+  writeBlock(stream->buffer, stream->blockno);
   return 0;
 }
-
+/*
 MyFILE * myfopen(char * name, const char * mode){
   int fileEntryIndex = findEntryIndex(name, name);
   if (fileEntryIndex == -1 && strncmp(mode, "w", 1) == 0){
@@ -212,6 +209,7 @@ MyFILE * myfopen(char * name, const char * mode){
     printf("no read mode");
   }
 }
+*/
 
 int myfclose(MyFILE *file)
 {
