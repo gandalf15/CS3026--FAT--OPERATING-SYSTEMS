@@ -85,7 +85,7 @@ void format (char * disk_name){
    emptyDir->isdir = TRUE;
    emptyDir->unused = TRUE;
    emptyDir->filelength = 0;
-   strcpy(emptyDir->name,"unused dir entry");
+   strcpy(emptyDir->name,"\0");
    for (i = 0; i < DIRENTRYCOUNT; i++){
      rootBlock.dir.entrylist[i] = *emptyDir;
    }
