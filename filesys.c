@@ -140,8 +140,18 @@ int findEntryIndex(const char * name){
 
 int myRm (const char * name){
   int entryIndex = findEntryIndex(name);
+  if (entryIndex == -1){
+    return 1;
+  }
   int fatBlockIndex = virtualDisk[currentDirIndex].dir.entrylist[entryIndex].firstblock;
+  virtualDisk[currentDirIndex].dir.entrylist[entryIndex].firstblock = 0;
+  virtualDisk[currentDirIndex].dir.entrylist[entryIndex].isdir = FALSE;
   virtualDisk[currentDirIndex].dir.entrylist[entryIndex].unused = TRUE;
+  virtualDisk[currentDirIndex].dir.entrylist[entryIndex].filelength = 0;
+  int i;
+  for (i = 0; i < MAXNAME; i++) {
+    virtualDisk[currentDirIndex].dir.entrylist[entryIndex].name[i] = '\0';
+  }
   int nextIndex = fatBlockIndex;
   while(TRUE){
     if(FAT[nextIndex] == ENDOFCHAIN){
@@ -177,6 +187,9 @@ int myfputc(char b, MyFILE * stream){
     writeBlock(&stream->buffer,stream->blockno);
     stream->pos = 0;
     int index = getFreeBlock();
+    if(index == -1){
+      return 1;
+    }
     diskblock_t newBlock = initBlock(index, DATA);
     memcpy(&stream->buffer, &newBlock, BLOCKSIZE);
     FAT[stream->blockno] = index;
@@ -184,6 +197,7 @@ int myfputc(char b, MyFILE * stream){
     stream->blockno = index;
     copyFat(FAT);
   }
+  stream->filelength += 1;
   stream->buffer.data[stream->pos] = b;
   stream->pos += 1;
   return 0;
@@ -191,8 +205,8 @@ int myfputc(char b, MyFILE * stream){
 
 MyFILE * myfopen(char * name,const char mode){
   if(mode == 'w'){
+    myRm(name);
     int index = getFreeBlock();
-    //diskblock_t newBlock = initBlock(index, DATA);
     FAT[index] = ENDOFCHAIN;
     int i;
     for(i = 0; i < DIRENTRYCOUNT; i++){
@@ -200,6 +214,7 @@ MyFILE * myfopen(char * name,const char mode){
         virtualDisk[currentDirIndex].dir.entrylist[i].unused = FALSE;
         strcpy(virtualDisk[currentDirIndex].dir.entrylist[i].name, name);
         virtualDisk[currentDirIndex].dir.entrylist[i].firstblock = index;
+        currentDir = &virtualDisk[currentDirIndex].dir.entrylist[i];
         break;
       }
     }
@@ -207,6 +222,8 @@ MyFILE * myfopen(char * name,const char mode){
     memset(file, '\0', BLOCKSIZE);
     file->pos = 0;
     file->writing = 1;
+    file->filelength = currentDir->filelength;
+    //printf("when opened file length is %d\n", file->filelength);
     strcpy(file->mode, &mode);
     file->blockno = index;
     memmove (&file->buffer, &virtualDisk[index], BLOCKSIZE );
@@ -219,6 +236,7 @@ MyFILE * myfopen(char * name,const char mode){
   file->writing = 0;
   strcpy(file->mode, &mode);
   file->blockno = virtualDisk[currentDirIndex].dir.entrylist[dirEntryIndex].firstblock;
+  currentDir = &virtualDisk[currentDirIndex].dir.entrylist[dirEntryIndex];
   memcpy(&file->buffer, &virtualDisk[file->blockno], BLOCKSIZE);
   return file;
 }
@@ -226,8 +244,11 @@ MyFILE * myfopen(char * name,const char mode){
 int myfclose(MyFILE *file){
   if (file->writing == 1){
     myfputc(EOF, file);
+    currentDir->filelength = file->filelength;
     writeBlock(&file->buffer, file->blockno);
   }
+  //printf("when closing file length is %d Bytes\n", currentDir->filelength);
+  currentDir = NULL;
   free(file);
   return 0;
 }
