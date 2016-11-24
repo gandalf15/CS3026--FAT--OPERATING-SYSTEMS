@@ -156,6 +156,7 @@ int myRm (const char * name){
   while(TRUE){
     if(FAT[nextIndex] == ENDOFCHAIN){
       FAT[nextIndex] = UNUSED;
+      copyFat(FAT);
       return 0;
     }
     nextIndex = FAT[fatBlockIndex];
