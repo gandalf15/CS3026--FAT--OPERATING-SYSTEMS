@@ -156,27 +156,25 @@ int myRm (const char * name){
 
 char myfgetc(MyFILE * stream){
   if (stream->pos >= BLOCKSIZE){
+    printf("myfgetc current pos: %d\n", stream->pos);
     if (FAT[stream->blockno] == ENDOFCHAIN){
       return EOF;
-    }else{
-      stream->blockno = FAT[stream->blockno];
-      memcpy(&stream->buffer, &virtualDisk[stream->blockno], BLOCKSIZE);
-      stream->pos = 0;
-      return stream->buffer.data[stream->pos];
     }
+    stream->blockno = FAT[stream->blockno];
+    memcpy(&stream->buffer, &virtualDisk[stream->blockno], BLOCKSIZE);
+    stream->pos = 1;
+    return stream->buffer.data[stream->pos-1];
   }
   if(stream->buffer.data[stream->pos] == EOF){
     return EOF;
   }
-  char mychar = stream->buffer.data[stream->pos];
   ++stream->pos;
-  return mychar;
+  return stream->buffer.data[stream->pos-1];
 }
 
 int myfputc(char b, MyFILE * stream){
   if (strcmp(stream->mode, "r") == 0) return 1;
   if (stream->pos >= BLOCKSIZE){
-    printf("Blocksize reached getting new block and writing buffer\n");
     writeBlock(&stream->buffer,stream->blockno);
     stream->pos = 0;
     int index = getFreeBlock();
@@ -191,7 +189,6 @@ int myfputc(char b, MyFILE * stream){
   printf("myfputc write char %c to pose ", stream->buffer.data[stream->pos]);
   printf("%d\n", stream->pos);
   stream->pos += 1;
-  writeBlock(&stream->buffer, stream->blockno);
   return 0;
 }
 
@@ -240,6 +237,7 @@ MyFILE * myfopen(char * name,const char mode){
 int myfclose(MyFILE *file){
   if (file->writing == 1){
     myfputc(EOF, file);
+    writeBlock(&file->buffer, file->blockno);
   }
   free(file);
   return 0;
