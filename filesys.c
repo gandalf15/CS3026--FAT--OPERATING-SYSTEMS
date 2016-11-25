@@ -79,6 +79,8 @@ void format (char * disk_name){
    //call init block and get clean block
    rootBlock.dir.isdir = TRUE;
    rootBlock.dir.nextEntry = FALSE; //does not have to be if the block is zeroed
+   rootBlock.dir.parentDirBlock = FALSE;
+   rootBlock.dir.parentDirEntry = FALSE;
    rootDirIndex = num_of_fat_blocks+1;
    currentDirIndex = num_of_fat_blocks+1;
    direntry_t *emptyDir = calloc(1,sizeof(direntry_t));
@@ -93,20 +95,26 @@ void format (char * disk_name){
    writeBlock(&rootBlock, rootDirIndex);
 }
 
-int getFreeBlock(){
+int getFreeBlockIndex(){
   int i;
   for(i = 0; i < MAXBLOCKS; i++){
-    if (FAT[i] == UNUSED){return i;}
+    if (FAT[i] == UNUSED){
+      FAT[i] = ENDOFCHAIN;
+      copyFat(FAT);
+      return i;
+    }
   }
   return -1;
 }
 
-diskblock_t initBlock(int index, const char type){
+diskblock_t initBlock(int index, const char type, int parentDirBlock, int parentDirEntry){
   int i;
   diskblock_t block;
   if(type == DIR){
     block.dir.isdir = TRUE;
     block.dir.nextEntry = 0;
+    block.dir.parentDirBlock = parentDirBlock;
+    block.dir.parentDirEntry = parentDirEntry;
     direntry_t *newEntry = malloc(sizeof(direntry_t));
     newEntry->unused = TRUE;
     newEntry->filelength = 0;
@@ -187,11 +195,11 @@ int myfputc(char b, MyFILE * stream){
   if (stream->pos >= BLOCKSIZE){
     writeBlock(&stream->buffer,stream->blockno);
     stream->pos = 0;
-    int index = getFreeBlock();
+    int index = getFreeBlockIndex();
     if(index == -1){
       return 1;
     }
-    diskblock_t newBlock = initBlock(index, DATA);
+    diskblock_t newBlock = initBlock(index, DATA, 0, 0);
     memcpy(&stream->buffer, &newBlock, BLOCKSIZE);
     FAT[stream->blockno] = index;
     FAT[index] = ENDOFCHAIN;
@@ -204,21 +212,41 @@ int myfputc(char b, MyFILE * stream){
   return 0;
 }
 
+direntry_t *initDirEntry(char *name, const char type, int first_block_index){
+  FAT[first_block_index] = ENDOFCHAIN;    //change entry in FAT for DIR or DATA block
+  int i;
+  for(i = 0; i < DIRENTRYCOUNT; i++){
+    if (virtualDisk[currentDirIndex].dir.entrylist[i].unused == TRUE){
+      virtualDisk[currentDirIndex].dir.entrylist[i].unused = FALSE;
+      virtualDisk[currentDirIndex].dir.entrylist[i].isdir = type;
+      initBlock(first_block_index, type, currentDirIndex, i);
+      memset(&virtualDisk[currentDirIndex].dir.entrylist[i].name, '\0', MAXNAME);
+      strcpy(virtualDisk[currentDirIndex].dir.entrylist[i].name, name);
+      virtualDisk[currentDirIndex].dir.entrylist[i].firstblock = first_block_index;
+      currentDir = &virtualDisk[currentDirIndex].dir.entrylist[i];
+      copyFat(FAT);
+      return &virtualDisk[currentDirIndex].dir.entrylist[i];
+    }
+    if (i == 2){
+      i = 0;
+      int newBlockIndex = getFreeBlockIndex();
+      if(newBlockIndex == -1){
+        return NULL;
+      }
+      initBlock(newBlockIndex, DIR, virtualDisk[currentDirIndex].dir.parentDirBlock, virtualDisk[currentDirIndex].dir.parentDirEntry);
+      FAT[currentDirIndex] = newBlockIndex;
+      FAT[newBlockIndex] = ENDOFCHAIN;
+      virtualDisk[currentDirIndex].dir.nextEntry = newBlockIndex;
+      currentDirIndex = newBlockIndex;
+    }
+  }
+}
+
 MyFILE * myfopen(char * name,const char mode){
   if(mode == 'w'){
     myRm(name);
-    int index = getFreeBlock();
-    FAT[index] = ENDOFCHAIN;
-    int i;
-    for(i = 0; i < DIRENTRYCOUNT; i++){
-      if (virtualDisk[currentDirIndex].dir.entrylist[i].unused == TRUE){
-        virtualDisk[currentDirIndex].dir.entrylist[i].unused = FALSE;
-        strcpy(virtualDisk[currentDirIndex].dir.entrylist[i].name, name);
-        virtualDisk[currentDirIndex].dir.entrylist[i].firstblock = index;
-        currentDir = &virtualDisk[currentDirIndex].dir.entrylist[i];
-        break;
-      }
-    }
+    int index = getFreeBlockIndex();
+    initDirEntry(name, DATA, index);
     MyFILE * file = malloc(sizeof(MyFILE));
     memset(file, '\0', BLOCKSIZE);
     file->pos = 0;
