@@ -8,6 +8,7 @@ MyFILE * myfopen(char * name, const char mode);
 int myfputc(char b, MyFILE * stream);
 char myfgetc(MyFILE * stream);
 int myfclose(MyFILE *file);
+int mymkdir(char *path);
 
 void cgsD(){
   format("CS3026 Operating Systems Assessment 2016");
@@ -38,7 +39,15 @@ void cgsC(){
   writeDisk("virtualdiskC3_C1\0");
 }
 
+void cgsB(){
+  int result = mymkdir("/system/looooool/hoooooooooj/rrrrrrrrrrrrrr");
+  writeDisk("virtualdiskB3_B1\0");
+  result = mymkdir("system/path/like");
+  writeDisk("virtualdiskB3_B1\0");
+}
+
 void main(){
   cgsD();
-  cgsC();
+  //cgsC();
+  cgsB();
 }

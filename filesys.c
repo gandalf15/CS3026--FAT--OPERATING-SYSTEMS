@@ -115,11 +115,11 @@ diskblock_t initBlock(int index, const char type, int parentDirBlock, int parent
     block.dir.nextEntry = 0;
     block.dir.parentDirBlock = parentDirBlock;
     block.dir.parentDirEntry = parentDirEntry;
-    direntry_t *newEntry = malloc(sizeof(direntry_t));
+    direntry_t *newEntry = calloc(1, sizeof(direntry_t));
     newEntry->unused = TRUE;
     newEntry->filelength = 0;
     for(i = 0; i < DIRENTRYCOUNT; i ++){
-      memcpy(&block.dir.entrylist[i], newEntry, DIRENTRYCOUNT);
+      memmove(&block.dir.entrylist[i], newEntry, sizeof(direntry_t));
     }
     free(newEntry);
   }
@@ -228,7 +228,7 @@ direntry_t *initDirEntry(char *name, const char type, int first_block_index){
       return &virtualDisk[currentDirIndex].dir.entrylist[i];
     }
     if (i == 2){
-      i = 0;
+      i = -1;
       int newBlockIndex = getFreeBlockIndex();
       if(newBlockIndex == -1){
         return NULL;
@@ -240,6 +240,31 @@ direntry_t *initDirEntry(char *name, const char type, int first_block_index){
       currentDirIndex = newBlockIndex;
     }
   }
+}
+
+int mymkdir(char *path){
+  const char parser[2] = "/";
+  char * pathCopy = malloc(strlen(path));
+  strcpy(pathCopy, path);
+  char *token;
+  token = strtok(pathCopy,parser);
+  if (pathCopy[0] != '/'){
+    currentDirIndex = currentDir->firstblock;
+  }
+  currentDirIndex = rootDirIndex;
+  while (token != NULL){
+    int entryIndex = findEntryIndex(token);
+    if (entryIndex > -1){
+      currentDirIndex = virtualDisk[currentDirIndex].dir.entrylist[entryIndex].firstblock;
+
+    }else{
+      int freeBlockIndex = getFreeBlockIndex();
+      initDirEntry(token, DIR, freeBlockIndex);
+    }
+    token = strtok(NULL, parser);
+  }
+  free(pathCopy);
+  return 0;
 }
 
 MyFILE * myfopen(char * name,const char mode){
